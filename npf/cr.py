@@ -1,29 +1,43 @@
 from urllib.parse import urlparse
 from threading import Thread
-import http.client, sys
+import http.client
+import sys
 import queue
+import requests
 
 concurrent = 200
+
 
 def doWork():
     while True:
         url = q.get()
-        status, url = getStatus(url)
-        doSomethingWithResult(status, url)
+        resp, read, url = getStatus(url)
+        doSomethingWithResult(resp, read, url)
         q.task_done()
+
 
 def getStatus(ourl):
     try:
         url = urlparse(ourl)
-        conn = http.client.HTTPConnection(url.netloc)   
-        conn.request("GET", url.path)
+        conn = http.client.HTTPConnection(url.netloc)
+        conn.request("HEAD", url.path)
         res = conn.getresponse()
-        return res.status, ourl
+        return res.status, len(res.read()), ourl
     except:
         return "error", ourl
 
-def doSomethingWithResult(status, url):
-    print (status, url)
+
+def getInfo(url):
+    try:
+        res = requests.head(url)
+        return res.status_code, res.headers['Content-Length'], url
+    except:
+        return "error", url
+
+
+def doSomethingWithResult(resp, read, url):
+    print (resp, read, url)
+
 
 q = queue.Queue(concurrent * 2)
 for i in range(concurrent):
