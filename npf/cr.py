@@ -1,42 +1,53 @@
 from urllib.parse import urlparse
+from urllib.parse import urlencode
 from threading import Thread
 import http.client
 import sys
 import queue
 import requests
+import pymysql
+import logging
+import csv
+import os;
 
-concurrent = 200
-
+concurrent = 500
+data = []
 
 def doWork():
     while True:
-        url = q.get()
-        resp, read, url = getStatus(url)
-        doSomethingWithResult(resp, read, url)
+        row = q.get()
+        if len(row) == 6:
+            d,firstLabel,secondLabel,title,url,isExternal = row
+            isExternal = int(isExternal)
+            status,hd,url = getStatus(d,url,isExternal)
+            doSomethingWithResult(d,firstLabel,secondLabel,title,url,status,hd,isExternal)
+        else:
+            print(row)
+
         q.task_done()
 
 
-def getStatus(ourl):
+def getStatus(d,ourl,isExternal):
     try:
-        url = urlparse(ourl)
-        conn = http.client.HTTPConnection(url.netloc)
-        conn.request("HEAD", url.path)
-        res = conn.getresponse()
-        return res.status, len(res.read()), ourl
-    except:
-        return "error", ourl
 
+        url = ourl
+        if not isExternal:
+           url = d+ourl
+            
+        if isExternal:
+            res = requests.head(url)
+        else:
+            res = requests.get(url)    
+        print (url)
+        return res.status_code, len(res.content), ourl
 
-def getInfo(url):
-    try:
-        res = requests.head(url)
-        return res.status_code, res.headers['Content-Length'], url
-    except:
-        return "error", url
+    except requests.exceptions.RequestException as e:
+        return 0, 0, ourl
 
-
-def doSomethingWithResult(resp, read, url):
-    print (resp, read, url)
+def doSomethingWithResult(d,firstLabel,secondLabel,title,url,status,hd,isExternal):
+    
+     data.append((d,firstLabel,secondLabel,title,url,status,hd,isExternal,1))
+   
 
 
 q = queue.Queue(concurrent * 2)
@@ -45,8 +56,28 @@ for i in range(concurrent):
     t.daemon = True
     t.start()
 try:
-    for url in open('urllist.txt'):
-        q.put(url.strip())
+    connection = pymysql.connect("localhost","root","root","scrapy",charset='utf8')
+    cursor = connection.cursor()
+
+    
+
+
+    sql = "select domain,firstLabel,secondLabel,title,link,isExternal from links where status !=404 and crawled=0 order by domain,isExternal limit 5000";
+    cursor.execute(sql)
+    result=cursor.fetchall()
+    
+    for row in result:
+             q.put(row)
     q.join()
+
+    #print(data)
+
+    stmt = "INSERT INTO tmp_links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal,crawled) VALUES (%s, %s,%s, %s,%s,%s, %s,%s, %s)"
+    cursor.executemany(stmt, data)
+
+    sql = "update links set crawled=1 where crawled=0 limit 5000";
+    cursor.execute(sql)
+    connection.commit()
+    
 except KeyboardInterrupt:
     sys.exit(1)
