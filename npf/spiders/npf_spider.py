@@ -16,7 +16,7 @@ class NpfSpider(scrapy.Spider):
     def start_requests(self):
         db = pymysql.connect("localhost", "root", "root", "scrapy")
         cursor = db.cursor()
-        sql = "select domain from scraped_domains where crawled=0 and domain_type in ('Division','District','Upazilla') order by FIND_IN_SET(domain_type,'Division,District,Upazilla,Union')"
+        sql = "select domain from scraped_domains where crawled=0 order by FIND_IN_SET(domain_type,'Division,District,Upazilla,Union,Office')"
         cursor.execute(sql)
         result = cursor.fetchall()
         for row in result:
@@ -28,7 +28,7 @@ class NpfSpider(scrapy.Spider):
 
         if response.css('#dawgdrops>ul>li') or response.css('div.box') or response.css('#right-content>div.right-block'):
             items = []
-            self.logger.info('Parse function called on %s', response.url)
+            self.logger.info('Parsing: %s', response.url)
             # Main Manu
             for firstLabel in response.css('#dawgdrops>ul>li'):
                 for secondLabel in firstLabel.css('div>div'):
@@ -92,7 +92,7 @@ class NpfSpider(scrapy.Spider):
                         items.append(item)
 
             domain = DomainItem()
-            domain['name'] = items[0]['domain']
+            domain['name'] = response.url
             domain['links'] = items
             yield domain
         else:

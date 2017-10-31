@@ -1,7 +1,5 @@
-from urllib.parse import urlparse
-from urllib.parse import urlencode
+
 from threading import Thread
-import http.client
 import sys
 import queue
 import requests
@@ -19,7 +17,7 @@ connection = pymysql.connect(
     "localhost", "root", "root", "scrapy", charset='utf8')
 cursor = connection.cursor()
 
-fetchLimit = 100000
+fetchLimit = 5000
 
 
 def doWork():
@@ -29,8 +27,8 @@ def doWork():
             d, firstLabel, secondLabel, title, url, isExternal = row
             isExternal = int(isExternal)
             status, hd, url = getStatus(d, url, isExternal)
-            doSomethingWithResult(d, firstLabel, secondLabel,
-                                  title, url, status, hd, isExternal)
+            #doSomethingWithResult(d, firstLabel, secondLabel,
+            #                      title, url, status, hd, isExternal)
         else:
             print(row)
 
@@ -58,10 +56,11 @@ def getStatus(d, ourl, isExternal):
 def doSomethingWithResult(d, firstLabel, secondLabel, title, url, status, hd, isExternal):
 
     data.append((d, firstLabel, secondLabel, title,
-                 url, status, hd, isExternal, 1))
+                url, status, hd, isExternal, 1))
 
 
 def startTaskParallal(dataLIst):
+    
     urls = []
     for row in dataLIst:
         d, firstLabel, secondLabel, title, url, isExternal = row
@@ -80,8 +79,8 @@ def startTaskParallal(dataLIst):
             data.append((d, firstLabel, secondLabel, title,
                          url, res.status_code, len(res.content), isExternal, 1))
 
-    # insertUpdate(data)
-    # data.clear()
+    insertUpdate(data)
+    data.clear()
 
 
 def startTask(dataLIst):
@@ -96,8 +95,8 @@ def startTask(dataLIst):
             q.put(row)
         q.join()
 
-        insertUpdate(data)
-        data.clear()
+        #insertUpdate(data)
+        #data.clear()
 
     except KeyboardInterrupt:
         sys.exit(1)
