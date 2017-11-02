@@ -10,14 +10,14 @@ import os
 import grequests
 import time
 
-concurrent = 500
+concurrent = 2
 q = queue.Queue(concurrent * 2)
 data = []
 connection = pymysql.connect(
     "localhost", "root", "root", "scrapy", charset='utf8')
 cursor = connection.cursor()
 
-fetchLimit = 5000
+fetchLimit = 1000
 
 
 def doWork():
@@ -31,7 +31,6 @@ def doWork():
             #                      title, url, status, hd, isExternal)
         else:
             print(row)
-
         q.task_done()
 
 
@@ -115,10 +114,11 @@ def getLinks():
     sql = "select domain,firstLabel,secondLabel,title,link,isExternal from links where status !=404 and isExternal=0 and crawled=0 order by id limit %s" % fetchLimit
     cursor.execute(sql)
     result = cursor.fetchall()
-    startTaskParallal(result)
+    startTask(result)
     end = time.time()
     print(end - start)
 
 
 for i in range(0, 1):
     getLinks()
+    time.sleep(10)

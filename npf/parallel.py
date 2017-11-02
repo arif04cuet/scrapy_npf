@@ -1,41 +1,53 @@
+#!/usr/local/bin/python3.5
 import asyncio
-import aiohttp
-from datetime import datetime
 import pymysql
-statuses = []
+from aiohttp import ClientSession
 
-
-@asyncio.coroutine
-def get(url):
-    
-    try:
-        print('[{}] Doing GET request to {}'.format(datetime.now().strftime('%H:%M:%S:%f'), url)) 
-        response = yield from aiohttp.request('GET', url)
-        statuses.append({'url': url, 'length':response.headers.get('Content-Length'), 'status': response.status})
-    except Exception as e:
-        print("%s" % (e))
-            # now you can decide what you want to do
-            # either return the response anyways or do some handling right here
-    #response.close()
-
-
-connection = pymysql.connect("localhost","root","root","scrapy",charset='utf8')
+connection = pymysql.connect(
+    "localhost", "root", "root", "scrapy", charset='utf8')
 cursor = connection.cursor()
-sql = "select domain,firstLabel,secondLabel,title,link,isExternal from links where status !=404 and crawled=0 order by domain,isExternal limit 1000";
-cursor.execute(sql)
-result=cursor.fetchall()
-urls = []
-for row in result:
-    d,firstLabel,secondLabel,title,url,isExternal = row
-    isExternal = int(isExternal)
-    if not isExternal:
-       url = d+url
-    urls.append(url)
 
-tasks = [asyncio.Task(get(url)) for url in urls]
+fetchLimit = 10000
+
+
+async def fetch(row, session):
+
+    d, firstLabel, secondLabel, title, link, isExternal = row
+    isExternal = int(isExternal)
+    url = link
+    if not isExternal:
+        url = d + link
+    
+    async with session.get(url) as response:
+        print(url)
+        return d, firstLabel, secondLabel, title, link, isExternal,len(await response.read()),response.status
+
+async def run(r):
+    url = "http://dhaka.gov.bd/"
+    tasks = []
+
+    # Fetch all responses within one Client session,
+    # keep connection alive for all requests.
+    async with ClientSession() as session:
+        for row in getLinks():
+            task = asyncio.ensure_future(fetch(row, session))
+            tasks.append(task)
+        responses = []    
+        try:
+            responses = await asyncio.gather(*tasks)
+        except Exception as e:
+            print(e)    
+
+        # you now have all response bodies in this variable
+        print(len(responses))
+
+def getLinks():
+    
+    sql = "select domain,firstLabel,secondLabel,title,link,isExternal from links where status !=404 and isExternal=0 and crawled=0 order by id limit %s" % fetchLimit
+    cursor.execute(sql)
+    result = cursor.fetchall()
+    return result
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(asyncio.gather(*tasks))
-loop.close()
-
-print('****** STATUSES:', statuses)
+future = asyncio.ensure_future(run(4))
+loop.run_until_complete(future)
