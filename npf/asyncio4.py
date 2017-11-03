@@ -3,65 +3,77 @@ import datetime
 import asyncio
 import aiohttp
 import pymysql
-import requests
 import concurrent.futures
+import requests
 
-fetchLimit = 50
+fetchLimit = 1000
 data = []
+ids = []
 
-
-def formatUrl(url):
-    return url + '?run={}'.format(time.time())
+connection = pymysql.connect(
+    "localhost", "root", "root", "scrapy", charset='utf8')
+cursor = connection.cursor()
 
 
 def getLinks():
-    connection = pymysql.connect(
-        "localhost", "root", "root", "scrapy", charset='utf8')
-    cursor = connection.cursor()
-    sql = "select domain,firstLabel,secondLabel,title,link,isExternal from links where status !=404 and isExternal=0 and crawled=0 order by id limit %s" % fetchLimit
+    sql = "select id,domain,firstLabel,secondLabel,title,link,isExternal from links where isExternal=0 and status !=404 order by domain limit %s" % fetchLimit
     cursor.execute(sql)
     result = cursor.fetchall()
     return result
 
 
-def storeData(row):
-    data.append(row)
+def storeData():
+    stmt = "INSERT INTO tmp_links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal,crawled) VALUES (%s, %s,%s, %s,%s,%s, %s,%s, %s)"
+    cursor.executemany(stmt, data)
+    #sql = "update links set crawled=1 where status !=404 and isExternal=0 and crawled=0 limit %s" % fetchLimit
+    sql = 'delete from links where id in (' + ','.join(
+        map(str, ids)) + ')'
+    cursor.execute(sql)
+    connection.commit()
+    cursor.close()
+    connection.close()
 
 
-async def get(row):
+def get(row):
 
-    d, firstLabel, secondLabel, title, link, isExternal = row
+    id, d, firstLabel, secondLabel, title, link, isExternal = row
     isExternal = int(isExternal)
     url = link
     if not isExternal:
         url = d + link
+    try:
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            print(response.url)
-            status = response.status
-            body = len(await response.read())
-            item = (d, firstLabel, secondLabel, title,
-                    link, status, body, isExternal, 1)
-            await storeData(item)
+        response = requests.get(url)
+        print(response.url)
+        status = response.status_code
+        body = len(response.content)
+        item = (d, firstLabel, secondLabel, title,
+                link, status, body, isExternal, 1)
+        data.append(item)
+        ids.append(id)
+
+    except Exception as e:
+        print(e)
 
 
 async def main():
 
-    loop = asyncio.get_event_loop()
-    futures = [
-        loop.run_in_executor(
-            None,
-            requests.get,
-            i[0] + i[4]
-        )
-        for i in getLinks()
-    ]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
+        loop = asyncio.get_event_loop()
+        futures = [
+            loop.run_in_executor(
+                None,
+                get,
+                i
+            )
+            for i in getLinks()
+        ]
 
-    start = time.time()
-    print(len(await asyncio.gather(*futures)))
-    end = time.time()
-    print(end - start)
+        start = time.time()
+        print(len(await asyncio.gather(*futures)))
+        storeData()
+        end = time.time()
+        print(end - start)
 
 
 loop = asyncio.get_event_loop()
