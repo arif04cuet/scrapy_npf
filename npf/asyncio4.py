@@ -1,11 +1,12 @@
-import aiohttp
-import asyncio
-import async_timeout
-import os
-import pymysql
 import time
+import datetime
+import asyncio
+import aiohttp
+import pymysql
+import concurrent.futures
+import requests
 
-fetchLimit = 300
+fetchLimit = 1000
 data = []
 ids = []
 
@@ -33,42 +34,47 @@ def storeData():
     connection.close()
 
 
-@asyncio.coroutine 
-def download_coroutine(session, row):
+def get(row):
+
     id, d, firstLabel, secondLabel, title, link, isExternal = row
     isExternal = int(isExternal)
     url = link
     if not isExternal:
-        url = d + link 
-       
-    with aiohttp.Timeout(20):
-        try:
-            
-            resp = yield from session.get(url)
-            status =resp.status
-            body = yield from resp.text()
-            item = (d, firstLabel, secondLabel, title,
-                            link, status, len(body), isExternal, 1)
-            print(url)
-            data.append(item)
-            ids.append(id)
-        except Exception as e:
-            print(e)
+        url = d + link
+    try:
+
+        response = requests.get(url)
+        print(response.url)
+        status = response.status_code
+        body = len(response.content)
+        item = (d, firstLabel, secondLabel, title,
+                link, status, body, isExternal, 1)
+        data.append(item)
+        ids.append(id)
+
+    except Exception as e:
+        print(e)
 
 
-@asyncio.coroutine 
-def main(loop):
- 
-    with aiohttp.ClientSession(loop=loop) as session:
-        tasks = [download_coroutine(session, row) for row in getLinks()]
-        yield from asyncio.gather(*tasks)
- 
- 
-if __name__ == '__main__':
-    start = time.time()
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(loop))
-    print(len(data))
-    storeData()
-    end = time.time()
-    print(end - start)
+async def main():
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
+        loop = asyncio.get_event_loop()
+        futures = [
+            loop.run_in_executor(
+                None,
+                get,
+                i
+            )
+            for i in getLinks()
+        ]
+
+        start = time.time()
+        print(len(await asyncio.gather(*futures)))
+        storeData()
+        end = time.time()
+        print(end - start)
+
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(main())

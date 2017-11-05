@@ -9,77 +9,125 @@ import csv
 import os
 import grequests
 import time
+from urllib.parse import urlparse, parse_qs
 
-concurrent = 2
+concurrent = 100
 q = queue.Queue(concurrent * 2)
+
+fetchLimit = 100000
 data = []
+ids = []
+
 connection = pymysql.connect(
     "localhost", "root", "root", "scrapy", charset='utf8')
 cursor = connection.cursor()
 
-fetchLimit = 1000
+
+def getLinks():
+    sql = "select id,domain,firstLabel,secondLabel,title,link,isExternal from tmp_links where status !=404 and isExternal=0 order by domain limit %s" % fetchLimit
+    cursor.execute(sql)
+    result = cursor.fetchall()
+    return result
+
+def copy404rows():
+    sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from links where status=404'
+    cursor.execute(sql)
+    sql = 'delete from tmp_links where status=404'
+    cursor.execute(sql)
+
+
+def storeData():
+    
+    if data:
+        stmt = "INSERT INTO links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) VALUES (%s, %s,%s, %s,%s,%s, %s,%s)"
+        cursor.executemany(stmt, data)
+
+    if ids:
+        sql = 'delete from tmp_links where id in (' + ','.join(
+            map(str, ids)) + ')'
+        cursor.execute(sql)
+        connection.commit()
+
+
 
 
 def doWork():
     while True:
         row = q.get()
-        if len(row) == 6:
-            d, firstLabel, secondLabel, title, url, isExternal = row
+        if len(row) == 7:
+            id, d, firstLabel, secondLabel, title, link, isExternal = row
             isExternal = int(isExternal)
-            status, hd, url = getStatus(d, url, isExternal)
-            #doSomethingWithResult(d, firstLabel, secondLabel,
-            #                      title, url, status, hd, isExternal)
+            url = link
+            if not isExternal:
+                url = d + link
+
+            status, hd = getStatus(d, url, isExternal)
+            item = (d, firstLabel, secondLabel, title,
+                        link, status, hd, isExternal, 1)
+
+            data.append(item)
+            ids.append(id)
+            print(len(ids))
+            if(len(ids) == fetchLimit-1):
+                storeData()
+                data.clear()
+                ids.clear()
         else:
             print(row)
+
         q.task_done()
 
 
-def getStatus(d, ourl, isExternal):
+def getStatus(d, url, isExternal):
+    
     try:
-
-        url = ourl
-        if not isExternal:
-            url = d + ourl
-
+        time.sleep(0.05)
         if isExternal:
             res = requests.head(url)
         else:
             res = requests.get(url)
-        print (url)
-        return res.status_code, len(res.content), ourl
+
+        return res.status_code, len(res.content)
 
     except requests.exceptions.RequestException as e:
-        return 0, 0, ourl
-
-
-def doSomethingWithResult(d, firstLabel, secondLabel, title, url, status, hd, isExternal):
-
-    data.append((d, firstLabel, secondLabel, title,
-                url, status, hd, isExternal, 1))
+        return 0, 0
 
 
 def startTaskParallal(dataLIst):
-    
+    concurrent_limit = 100
+    hdrs = {'connection' : 'keep-alive'}
     urls = []
+    tmp_data = {}
     for row in dataLIst:
-        d, firstLabel, secondLabel, title, url, isExternal = row
+        id, d, firstLabel, secondLabel, title, link, isExternal = row
+        
         isExternal = int(isExternal)
+        url = link
         if not isExternal:
-            url = d + url
-        urls.append(url)
+            url = d + link
+            
+        urls.append([id,url,isExternal])
+        tmp_data[id] = row
 
-    rs = (grequests.get(u) for u in urls)
+
+    rs = (grequests.head(u[1],allow_redirects=False,params={'uniqueid':u[0]}) if u[2] else grequests.get(u[1],allow_redirects=False,params={'uniqueid':u[0]}) for u in urls)
     #res = grequests.map(rs)
-    for res in grequests.imap(rs):
+    for res in grequests.imap(rs,size=concurrent_limit):
 
         if res is not None:
             url = res.url
-            print (url)
-            data.append((d, firstLabel, secondLabel, title,
-                         url, res.status_code, len(res.content), isExternal, 1))
-
-    insertUpdate(data)
-    data.clear()
+            print(url)
+            params = parse_qs(urlparse(url).query)
+            
+            if 'uniqueid' in params:
+                key = int(params['uniqueid'][0])
+                
+                id, d, firstLabel, secondLabel, title, link, isExternal = tmp_data[key]
+                
+                data.append((d, firstLabel, secondLabel, title,
+                            link, res.status_code, len(res.content), isExternal))
+                ids.append(id)
+                #print(len(ids))  
 
 
 def startTask(dataLIst):
@@ -101,24 +149,15 @@ def startTask(dataLIst):
         sys.exit(1)
 
 
-def insertUpdate(dataSet):
-    stmt = "INSERT INTO tmp_links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal,crawled) VALUES (%s, %s,%s, %s,%s,%s, %s,%s, %s)"
-    cursor.executemany(stmt, dataSet)
-    sql = "update links set crawled=1 where status !=404 and isExternal=0 and crawled=0 limit %s" % fetchLimit
-    cursor.execute(sql)
-    connection.commit()
-
-
-def getLinks():
-    start = time.time()
-    sql = "select domain,firstLabel,secondLabel,title,link,isExternal from links where status !=404 and isExternal=0 and crawled=0 order by id limit %s" % fetchLimit
-    cursor.execute(sql)
-    result = cursor.fetchall()
-    startTask(result)
-    end = time.time()
-    print(end - start)
-
+start = time.time()
+copy404rows()
 
 for i in range(0, 1):
-    getLinks()
-    time.sleep(10)
+    rows = getLinks()
+    startTaskParallal(rows)
+    storeData()
+
+cursor.close()
+connection.close()
+end = time.time()
+print(end - start)

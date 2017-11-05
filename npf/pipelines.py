@@ -50,7 +50,7 @@ class SQLStorePipeline(object):
                     link['isExternal']
                 ))
 
-            stmt = "INSERT INTO links (domain, firstLabel,secondLabel,title,link,status,hasData,isExternal) VALUES (%s, %s,%s, %s,%s,%s,%s,%s)"
+            stmt = "INSERT INTO tmp_links (domain, firstLabel,secondLabel,title,link,status,hasData,isExternal) VALUES (%s, %s,%s, %s,%s,%s,%s,%s)"
             self.cursor.executemany(stmt, data)
 
         domain = item['name']

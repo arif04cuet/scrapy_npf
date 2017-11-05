@@ -8,7 +8,8 @@ connection = pymysql.connect(
     "localhost", "root", "root", "scrapy", charset='utf8')
 cursor = connection.cursor()
 
-fetchLimit = 20000
+fetchLimit = 1000
+data = []
 
 
 async def fetch(row, session):
@@ -18,13 +19,15 @@ async def fetch(row, session):
     url = link
     if not isExternal:
         url = d + link
-    
+
     async with session.get(url) as response:
-        print(url)
-        return d, firstLabel, secondLabel, title, link, isExternal,len(await response.read()),response.status
+        # print(url)
+        row = (d, firstLabel, secondLabel, title, link, isExternal, len(await response.read()), response.status)
+        data.append(row)
+
 
 async def run(r):
-    url = "http://dhaka.gov.bd/"
+
     tasks = []
 
     # Fetch all responses within one Client session,
@@ -33,14 +36,16 @@ async def run(r):
         for row in getLinks():
             task = asyncio.ensure_future(fetch(row, session))
             tasks.append(task)
-        responses = []    
+
+        responses = []
         try:
             responses = await asyncio.gather(*tasks)
         except Exception as e:
-            print(e)    
+            print(e)
 
         # you now have all response bodies in this variable
-        print(len(responses))
+        print(len(data))
+
 
 async def go():
     async with create_pool(host='127.0.0.1', port=3306,
@@ -59,6 +64,7 @@ def getLinks():
     cursor.execute(sql)
     result = cursor.fetchall()
     return result
+
 
 loop = asyncio.get_event_loop()
 future = asyncio.ensure_future(run(4))
