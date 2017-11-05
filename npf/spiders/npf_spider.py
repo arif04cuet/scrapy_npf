@@ -16,7 +16,7 @@ class NpfSpider(scrapy.Spider):
     def start_requests(self):
         db = pymysql.connect("localhost", "root", "root", "scrapy")
         cursor = db.cursor()
-        sql = "select domain from scraped_domains where crawled=0 order by FIND_IN_SET(domain_type,'Division,District,Upazilla,Union,Office') limit 600"
+        sql = "select domain from scraped_domains where crawled=0 order by FIND_IN_SET(domain_type,'Division,District,Upazilla,Union,Office') limit 70"
         cursor.execute(sql)
         result = cursor.fetchall()
         for row in result:

@@ -2,12 +2,13 @@
 import asyncio
 import pymysql
 from aiohttp import ClientSession
+from aiomysql import create_pool
 
 connection = pymysql.connect(
     "localhost", "root", "root", "scrapy", charset='utf8')
 cursor = connection.cursor()
 
-fetchLimit = 10000
+fetchLimit = 20000
 
 
 async def fetch(row, session):
@@ -40,6 +41,17 @@ async def run(r):
 
         # you now have all response bodies in this variable
         print(len(responses))
+
+async def go():
+    async with create_pool(host='127.0.0.1', port=3306,
+                           user='root', password='root',
+                           db='scrapy',charset='utf8', loop=loop) as pool:
+        async with pool.get() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 42;")
+                value = await cur.fetchone()
+                print(value)
+
 
 def getLinks():
     
