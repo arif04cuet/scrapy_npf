@@ -24,3 +24,9 @@ class NpfItem(scrapy.Item):
 class DomainItem(scrapy.Item):
     name = scrapy.Field()
     links = scrapy.Field()
+
+
+class TmpItem(scrapy.Item):
+    link = scrapy.Field()
+    status = scrapy.Field()
+    hasData = scrapy.Field()

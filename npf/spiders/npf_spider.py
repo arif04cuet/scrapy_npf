@@ -6,7 +6,8 @@ import logging
 
 class NpfSpider(scrapy.Spider):
     name = "npf"
-    #start_urls = ['http://www.comilla.gov.bd']
+    with open("mymendiv.txt", "rt") as f:
+        start_urls = ['http://'+url.strip() for url in f.readlines()]
 
     def closed(self, reason):
         print('Finised!')
@@ -17,21 +18,39 @@ class NpfSpider(scrapy.Spider):
         return word.strip().strip("\'").strip('\"').replace("'", '').replace('"', '').replace(',', '')
 
     def start_requests(self):
-        db = pymysql.connect("localhost", "root", "root", "scrapy")
-        cursor = db.cursor()
-        sql = "select domain from scraped_domains where crawled=0 order by FIND_IN_SET(domain_type,'Division,District,Upazilla,Union,Office') limit 500"
-        cursor.execute(sql)
-        result = cursor.fetchall()
-        for row in result:
-            url = 'http://' + self.removeWhiteSpace(row[0])
-
-            yield scrapy.Request(url.strip(), self.parse)
-
+        # db = pymysql.connect("localhost", "root", "root", "scrapy")
+        # cursor = db.cursor()
+        # sql = "select domain from scraped_domains where crawled=0 order by FIND_IN_SET(domain_type,'Division,District,Upazilla,Union,Office') limit 500"
+        # cursor.execute(sql)
+        # result = cursor.fetchall()
+        # for row in result:
+        #     url = 'http://' + self.removeWhiteSpace(row[0])
+        #     yield scrapy.Request(url.strip(), self.parse)
+        with open("mymendiv.txt", "rt") as f:
+            for url in f.readlines():
+                request = scrapy.Request('http://'+url.strip(), self.parse)
+                #request.meta['proxy'] = '127.0.0.1'
+                yield request
+        
     def parse(self, response):
 
         if response.css('#dawgdrops>ul>li') or response.css('div.box') or response.css('#right-content>div.right-block'):
             items = []
             self.logger.info('Parsing: %s', response.url)
+            
+            #Banner
+            for slide in response.css('.rslides>li'):
+                item = NpfItem()
+                item['domain'] = response.url
+                item['firstLabel'] = 'Main'
+                item['secondLabel'] = 'Banner'
+                item['title'] = self.removeWhiteSpace(slide.css(
+                    "a::attr(title)").extract_first())
+                item['link'] = self.removeWhiteSpace(slide.css(
+                    "a::attr(href)").extract_first())
+
+                items.append(item)
+
             # Main Manu
             for firstLabel in response.css('#dawgdrops>ul>li'):
                 for secondLabel in firstLabel.css('div>div'):
@@ -62,37 +81,6 @@ class NpfSpider(scrapy.Spider):
                     item['link'] = self.removeWhiteSpace(
                         link.css("a::attr(href)").extract_first())
                     items.append(item)
-
-            # Right Bar
-            for box in response.css('#right-content>div.right-block'):
-
-                ulli = box.css('ul>li')
-                if ulli:
-                    for link in box.css('ul>li'):
-                        item = NpfItem()
-                        item['domain'] = response.url
-                        item['firstLabel'] = 'Right Bar'
-                        item['secondLabel'] = self.removeWhiteSpace(box.css(
-                            "h5::text").extract_first())
-                        item['title'] = self.removeWhiteSpace(
-                            link.css("a::text").extract_first())
-                        item['link'] = self.removeWhiteSpace(link.css(
-                            "a::attr(href)").extract_first())
-
-                        if item['secondLabel'] != 'কেন্দ্রীয় ই-সেবা':
-                            items.append(item)
-
-                else:
-                    for link in box.css('a.share-buttons'):
-                        item = NpfItem()
-                        item['domain'] = response.url
-                        item['firstLabel'] = 'Right Bar'
-                        item['secondLabel'] = 'Social Media'
-                        item['title'] = self.removeWhiteSpace(link.css(
-                            "img::attr(alt)").extract_first())
-                        item['link'] = self.removeWhiteSpace(
-                            link.css("::attr(href)").extract_first())
-                        items.append(item)
 
             domain = DomainItem()
             domain['name'] = response.url

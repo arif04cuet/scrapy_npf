@@ -20,7 +20,7 @@ NEWSPIDER_MODULE = 'npf.spiders'
 
 # Obey robots.txt rules
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 100
+CONCURRENT_REQUESTS = 200
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
@@ -51,8 +51,8 @@ TELNETCONSOLE_ENABLED = False
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 # DOWNLOADER_MIDDLEWARES = {
-#    'npf.middlewares.MyCustomDownloaderMiddleware': 543,
-#}
+#    'scrapy.contrib.downloadermiddleware.httpproxy.HttpProxyMiddleware': 1,
+# }
 
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
@@ -104,4 +104,7 @@ MYSQL_CLOSE_ON_ERROR = True
 ROBOTSTXT_OBEY = False
 LOG_LEVEL = 'INFO'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 5.1; rv:5.0) Gecko/20100101 Firefox/5.0'
-CONCURRENT_REQUESTS_PER_DOMAIN = 20
+HTTPERROR_ALLOWED_CODES = [404,403,400,302,301,503]
+CONCURRENT_REQUESTS_PER_DOMAIN = 200
+
+

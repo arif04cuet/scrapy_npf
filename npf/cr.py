@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 concurrent = 100
 q = queue.Queue(concurrent * 2)
 
-fetchLimit = 30000
+fetchLimit = 100
 insert_chunk_size = 1000
 data = []
 ids = []
@@ -58,10 +58,6 @@ def storeData():
         cursor.execute(sql)
         connection.commit()
        
-
-
-
-
 def doWork():
     while True:
         row = q.get()
@@ -96,7 +92,7 @@ def getStatus(d, url, isExternal):
             return res.status_code, 0
         else:
             res = requests.get(url,allow_redirects=False,timeout=15)
-            return res.status_code, getContentLength(res.content)
+            return res.status_code, res.content
 
     except requests.exceptions.RequestException as e:
         print(e)
@@ -126,7 +122,7 @@ def startTaskParallal(dataLIst):
 
         if res is not None:
             url = res.url
-            print(url)
+            #print(url)
             params = parse_qs(urlparse(url).query)
             
             if 'uniqueid' in params:
@@ -137,10 +133,11 @@ def startTaskParallal(dataLIst):
                 data.append((d, firstLabel, secondLabel, title,
                             link, res.status_code, len(res.content), isExternal))
                 ids.append(id)
-                if(len(ids) == insert_chunk_size):
-                    storeData()
-                    data.clear()
-                    ids.clear()
+                print(len(ids))
+                # if(len(ids) == insert_chunk_size):
+                #     storeData()
+                #     data.clear()
+                #     ids.clear()
 
 
 def startTask(dataLIst):
@@ -164,8 +161,10 @@ copy404rows()
 
 for i in range(0, 1):
     rows = getLinks()
-    startTask(rows)
-    storeData()
+    print(rows)
+
+    #startTask(rows)
+    #storeData()
 
 cursor.close()
 connection.close()
