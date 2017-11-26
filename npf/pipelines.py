@@ -12,7 +12,6 @@ class NpfExternalPipeline(object):
     data = []
 
     def process_item(self, item, spider):
-
         
         self.data.append(
             (
@@ -45,7 +44,7 @@ class NpfExternalPipeline(object):
         sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links'
         cursor.execute(sql)
         
-        sql = 'delete from tmp_links where isExternal=1'
+        sql = 'delete from tmp_links where isExternal=1 and status!=500'
         cursor.execute(sql)
         
         connection.commit()
@@ -145,9 +144,11 @@ class SQLStorePipeline(object):
 
                 
                 if link['isExternal'] and not validators.url(link['link']):
-                   link['status'] = 404
+                    pass
+                   #link['status'] = 404
                 elif not link['isExternal'] and not validators.url(row['domain']+link['link']):
-                    link['status'] = 404   
+                    pass
+                    #link['status'] = 404   
 
                 self.data.append((
                     row['domain'],
@@ -160,11 +161,24 @@ class SQLStorePipeline(object):
                     link['isExternal']
                 ))
 
-       
+        else:
+            self.data.append((
+                    item['name'],
+                    '',
+                    '',
+                    '',
+                    '',
+                    200,
+                    0,
+                    1
+                ))
+
+
         return item
 
     def close_spider(self, spider):
         
+        #print(self.data)
         stmt = "INSERT INTO tmp_links (domain, firstLabel,secondLabel,title,link,status,hasData,isExternal) VALUES (%s, %s,%s, %s,%s,%s,%s,%s)"
         self.cursor.executemany(stmt, self.data)
         self.connection.commit()
@@ -173,10 +187,10 @@ class SQLStorePipeline(object):
         self.cursor.execute(sql)
 
 
-        sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links where status=404 or firstLabel="সরকারি অফিস"'
+        sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links where status=404 or firstLabel like "%সরকারি অফিস%" or firstLabel like "%সরকারী অফিস সমূহ%"' 
         self.cursor.execute(sql)
 
-        sql = 'delete from tmp_links where status=404 or firstLabel="সরকারি অফিস"'
+        sql = 'delete from tmp_links where status=404 or firstLabel like "%সরকারি অফিস%" or firstLabel like "%সরকারী অফিস সমূহ%"'
         self.cursor.execute(sql)
 
         

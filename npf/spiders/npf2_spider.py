@@ -56,14 +56,14 @@ class Npf2Spider(scrapy.Spider):
             if row['isExternal']:
                 url = row['link']
             
-            request = scrapy.Request(url.strip(),method='HEAD',callback=self.parse,errback=self.errback_parse)
+            request = scrapy.Request(url.strip(),method='GET',callback=self.parse,errback=self.errback_parse)
             request.meta['row'] = row
             #request.meta['proxy'] = '127.0.0.1'
             yield request
 
     def parse(self, response):
         
-        length = len(self.removeWhiteSpace(response.css('div#printable_area').extract_first()))
+        length = len(response.css('div#printable_area').extract_first())
         row = response.meta['row']
 
         row['status'] = response.status
