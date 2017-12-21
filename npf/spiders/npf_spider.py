@@ -6,8 +6,8 @@ import logging
 
 class NpfSpider(scrapy.Spider):
     name = "npf"
-    with open("urls.txt", "rt") as f:
-        start_urls = ['http://'+url.strip() for url in f.readlines()]
+    # with open("my_urls.txt", "rt") as f:
+    #     start_urls = ['http://'+url.strip() for url in f.readlines()]
 
     def closed(self, reason):
         print('Finised!')
@@ -17,20 +17,16 @@ class NpfSpider(scrapy.Spider):
             return ''
         return word.strip().strip("\'").strip('\"').replace("'", '').replace('"', '').replace(',', '')
 
-    # def start_requests(self):
-    #     db = pymysql.connect("localhost", "root", "root", "scrapy")
-    #     cursor = db.cursor(pymysql.cursors.DictCursor)
-    #     sql = "SELECT domain FROM `dhaka_domains` where concat('http://',domain) not in (select distinct(domain) from tmp_links)"
-    #     cursor.execute(sql)
-    #     result = cursor.fetchall()
-    #     for row in result:
-    #         url = 'http://' + self.removeWhiteSpace(row['domain'])
-    #         yield scrapy.Request(url.strip(), self.parse)
-        # with open("mymendiv.txt", "rt") as f:
-        #     for url in f.readlines():
-        #         request = scrapy.Request('http://'+url.strip(), self.parse)
-        #         #request.meta['proxy'] = '127.0.0.1'
-        #         yield request
+    def start_requests(self):
+        db = pymysql.connect("localhost", "root", "root", "scrapy")
+        cursor = db.cursor(pymysql.cursors.DictCursor)
+        sql = "SELECT domain FROM `domains` where concat('http://',domain) not in (select distinct(domain) from tmp_links)"
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        for row in result:
+            url = 'http://' + self.removeWhiteSpace(row['domain'])
+            yield scrapy.Request(url.strip(), self.parse)
+        
         
     def parse(self, response):
 

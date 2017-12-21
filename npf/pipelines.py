@@ -126,7 +126,7 @@ class SQLStorePipeline(object):
             for row in item['links']:
 
                 link = {}
-                link['status'] = 200
+                link['status'] = 1
                 link['isExternal'] = 0
                 link['hasData'] = 0
 
@@ -187,10 +187,10 @@ class SQLStorePipeline(object):
         self.cursor.execute(sql)
 
 
-        sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links where status=404 or firstLabel like "%সরকারি অফিস%" or firstLabel like "%সরকারী অফিস সমূহ%"' 
+        sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links where status=404 or status =200 or firstLabel like "%সরকারি%" or firstLabel like "%সরকার%"' 
         self.cursor.execute(sql)
 
-        sql = 'delete from tmp_links where status=404 or firstLabel like "%সরকারি অফিস%" or firstLabel like "%সরকারী অফিস সমূহ%"'
+        sql = 'delete from tmp_links where status=404 or status=200 or firstLabel like "%সরকারি%" or firstLabel like "%সরকার%"'
         self.cursor.execute(sql)
 
         

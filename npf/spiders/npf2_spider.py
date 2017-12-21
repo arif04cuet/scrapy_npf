@@ -63,10 +63,15 @@ class Npf2Spider(scrapy.Spider):
 
     def parse(self, response):
         
-        length = len(response.css('div#printable_area').extract_first())
+        content = response.css('div#printable_area').extract_first()
         row = response.meta['row']
 
-        row['status'] = response.status
-        row['hasData'] = length
+        if content is None:
+            row['status'] = 404
+            row['hasData'] = 0
+        else:
+            length = len(response.css('div#printable_area').extract_first())
+            row['status'] = response.status
+            row['hasData'] = length
 
         yield row
