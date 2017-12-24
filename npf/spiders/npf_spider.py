@@ -20,7 +20,7 @@ class NpfSpider(scrapy.Spider):
     def start_requests(self):
         db = pymysql.connect("localhost", "root", "root", "scrapy")
         cursor = db.cursor(pymysql.cursors.DictCursor)
-        sql = "SELECT domain FROM `domains` where concat('http://',domain) not in (select distinct(domain) from tmp_links)"
+        sql = "SELECT domain FROM `domains` where concat('http://',domain) not in (select distinct(domain) from tmp_links) limit 2"
         cursor.execute(sql)
         result = cursor.fetchall()
         for row in result:

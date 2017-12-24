@@ -195,18 +195,18 @@ class SQLStorePipeline(object):
 
         # adjust data with previous month
         sql = "select domain,link,hasData from links where ((status=200 and hasData>499 and isExternal=0) or (status=200 and isExternal=1)) and  YEAR(created_at) = YEAR(CURRENT_DATE - INTERVAL 1 MONTH) AND MONTH(created_at) = MONTH(CURRENT_DATE - INTERVAL 1 MONTH)";
-        cursor.execute(sql)
-        result = cursor.fetchall()
+        self.cursor.execute(sql)
+        result = self.cursor.fetchall()
 
         for row in result:
             sql = "update tmp_links set status=200,crawled =1,hasData='%s' WHERE domain='%s' and link='%s' " %(row[2],row[0],row[1])
-            cursor.execute(sql)
+            self.cursor.execute(sql)
             
         sql = "insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) SELECT domain,firstLabel,secondLabel,title,link,status,hasData,isExternal FROM tmp_links WHERE crawled=1"
-        cursor.execute(sql)
+        self.cursor.execute(sql)
 
         sql = "delete FROM tmp_links WHERE crawled=1"
-        cursor.execute(sql)
+        self.cursor.execute(sql)
 
         
         self.connection.commit()
