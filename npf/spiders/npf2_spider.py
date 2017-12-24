@@ -48,7 +48,7 @@ class Npf2Spider(scrapy.Spider):
     def start_requests(self):
         db = pymysql.connect("localhost", "root", "root", "scrapy",charset='utf8')
         cursor = db.cursor(pymysql.cursors.DictCursor)
-        sql = "select id,domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links where isExternal=0 order by domain"
+        sql = "select id,domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links order by domain limit 100000"
         cursor.execute(sql)
         result = cursor.fetchall()
         for row in result:
@@ -58,20 +58,21 @@ class Npf2Spider(scrapy.Spider):
             
             request = scrapy.Request(url.strip(),method='GET',callback=self.parse,errback=self.errback_parse)
             request.meta['row'] = row
-            #request.meta['proxy'] = '127.0.0.1'
             yield request
 
     def parse(self, response):
         
-        content = response.css('div#printable_area').extract_first()
         row = response.meta['row']
+        
+        content = response.css('div#printable_area').extract_first()
+        status = response.status
 
         if content is None:
-            row['status'] = 404
-            row['hasData'] = 0
-        else:
-            length = len(response.css('div#printable_area').extract_first())
-            row['status'] = response.status
-            row['hasData'] = length
+            status =404
+            content = ''
+
+        length = len(content)
+        row['status'] = status
+        row['hasData'] = length
 
         yield row

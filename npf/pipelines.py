@@ -144,8 +144,7 @@ class SQLStorePipeline(object):
 
                 
                 if link['isExternal'] and not validators.url(link['link']):
-                    pass
-                   #link['status'] = 404
+                   link['status'] = 404
                 elif not link['isExternal'] and not validators.url(row['domain']+link['link']):
                     pass
                     #link['status'] = 404   
@@ -183,8 +182,8 @@ class SQLStorePipeline(object):
         self.cursor.executemany(stmt, self.data)
         self.connection.commit()
         
-        sql = "INSERT INTO unique_links (link,isExternal) select distinct(domain) as link,1 from tmp_links where domain not in(select link from unique_links)"
-        self.cursor.execute(sql)
+        # sql = "INSERT INTO unique_links (link,isExternal) select distinct(domain) as link,1 from tmp_links where domain not in(select link from unique_links)"
+        # self.cursor.execute(sql)
 
 
         sql = 'insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) select domain,firstLabel,secondLabel,title,link,status,hasData,isExternal from tmp_links where status=404 or status =200 or firstLabel like "%সরকারি%" or firstLabel like "%সরকার%"' 
@@ -192,6 +191,22 @@ class SQLStorePipeline(object):
 
         sql = 'delete from tmp_links where status=404 or status=200 or firstLabel like "%সরকারি%" or firstLabel like "%সরকার%"'
         self.cursor.execute(sql)
+
+
+        # adjust data with previous month
+        sql = "select domain,link,hasData from links where ((status=200 and hasData>499 and isExternal=0) or (status=200 and isExternal=1)) and  YEAR(created_at) = YEAR(CURRENT_DATE - INTERVAL 1 MONTH) AND MONTH(created_at) = MONTH(CURRENT_DATE - INTERVAL 1 MONTH)";
+        cursor.execute(sql)
+        result = cursor.fetchall()
+
+        for row in result:
+            sql = "update tmp_links set status=200,crawled =1,hasData='%s' WHERE domain='%s' and link='%s' " %(row[2],row[0],row[1])
+            cursor.execute(sql)
+            
+        sql = "insert into links (domain,firstLabel,secondLabel,title,link,status,hasData,isExternal) SELECT domain,firstLabel,secondLabel,title,link,status,hasData,isExternal FROM tmp_links WHERE crawled=1"
+        cursor.execute(sql)
+
+        sql = "delete FROM tmp_links WHERE crawled=1"
+        cursor.execute(sql)
 
         
         self.connection.commit()
