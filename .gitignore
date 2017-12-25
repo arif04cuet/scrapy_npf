@@ -18,3 +18,5 @@ htmlcov/
 
 # Windows
 Thumbs.db
+__pycache__/
+

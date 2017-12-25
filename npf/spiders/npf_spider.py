@@ -6,8 +6,8 @@ import logging
 
 class NpfSpider(scrapy.Spider):
     name = "npf"
-    # with open("my_urls.txt", "rt") as f:
-    #     start_urls = ['http://'+url.strip() for url in f.readlines()]
+    with open("my_urls.txt", "rt") as f:
+        start_urls = ['http://' + url.strip() for url in f.readlines()]
 
     def closed(self, reason):
         print('Finised!')
@@ -17,24 +17,23 @@ class NpfSpider(scrapy.Spider):
             return ''
         return word.strip().strip("\'").strip('\"').replace("'", '').replace('"', '').replace(',', '')
 
-    def start_requests(self):
-        db = pymysql.connect("localhost", "root", "root", "scrapy")
-        cursor = db.cursor(pymysql.cursors.DictCursor)
-        sql = "SELECT domain FROM `domains` where concat('http://',domain) not in (select distinct(domain) from tmp_links) limit 2"
-        cursor.execute(sql)
-        result = cursor.fetchall()
-        for row in result:
-            url = 'http://' + self.removeWhiteSpace(row['domain'])
-            yield scrapy.Request(url.strip(), self.parse)
-        
-        
+    # def start_requests(self):
+    #     db = pymysql.connect("localhost", "root", "root", "scrapy")
+    #     cursor = db.cursor(pymysql.cursors.DictCursor)
+    #     sql = "SELECT domain FROM `domains` where concat('http://',domain) not in (select distinct(domain) from tmp_links) and id=20128"
+    #     cursor.execute(sql)
+    #     result = cursor.fetchall()
+    #     for row in result:
+    #         url = 'http://' + self.removeWhiteSpace(row['domain'])
+    #         yield scrapy.Request(url.strip(), self.parse)
+
     def parse(self, response):
 
         if response.css('#dawgdrops>ul>li') or response.css('div.box') or response.css('#right-content>div.right-block'):
             items = []
             self.logger.info('Parsing: %s', response.url)
-            
-            #Banner
+
+            # Banner
             for slide in response.css('.rslides>li'):
                 item = NpfItem()
                 item['domain'] = response.url
